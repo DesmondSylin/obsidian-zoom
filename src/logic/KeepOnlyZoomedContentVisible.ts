@@ -77,6 +77,48 @@ export class KeepOnlyZoomedContentVisible {
     return null;
   }
 
+  private calculateIndentLevel(view: EditorView, from: number): number {
+    const line = view.state.doc.lineAt(from);
+    const match = line.text.match(/^(\s*)/);
+    if (match) {
+      const spaces = match[1];
+      // Calculate indent in pixels (assuming 4 spaces = 1 indent level, ~2em per level)
+      const indentChars = spaces.length;
+      return indentChars;
+    }
+    return 0;
+  }
+
+  private applyIndentRemoval(view: EditorView, indentChars: number) {
+    if (indentChars > 0) {
+      const editorEl = view.dom.closest(".cm-editor") as HTMLElement;
+      if (editorEl) {
+        editorEl.classList.add("zoom-plugin-remove-indent");
+        editorEl.style.setProperty(
+          "--zoom-indent-chars",
+          indentChars.toString()
+        );
+        this.logger.log(
+          "KeepOnlyZoomedContent:applyIndentRemoval",
+          "applying indent removal",
+          indentChars
+        );
+      }
+    }
+  }
+
+  private removeIndentRemoval(view: EditorView) {
+    const editorEl = view.dom.closest(".cm-editor") as HTMLElement;
+    if (editorEl) {
+      editorEl.classList.remove("zoom-plugin-remove-indent");
+      editorEl.style.removeProperty("--zoom-indent-chars");
+      this.logger.log(
+        "KeepOnlyZoomedContent:removeIndentRemoval",
+        "removing indent removal"
+      );
+    }
+  }
+
   public keepOnlyZoomedContentVisible(
     view: EditorView,
     from: number,
@@ -93,6 +135,10 @@ export class KeepOnlyZoomedContentVisible {
       effect.value.from,
       effect.value.to
     );
+
+    // Calculate and apply indent removal if needed
+    const indentChars = this.calculateIndentLevel(view, from);
+    this.applyIndentRemoval(view, indentChars);
 
     view.dispatch({
       effects: [effect],
@@ -111,6 +157,9 @@ export class KeepOnlyZoomedContentVisible {
 
   public showAllContent(view: EditorView) {
     this.logger.log("KeepOnlyZoomedContent:showAllContent", "show all content");
+
+    // Remove indent removal styling
+    this.removeIndentRemoval(view);
 
     view.dispatch({ effects: [zoomOutEffect.of()] });
     view.dispatch({
