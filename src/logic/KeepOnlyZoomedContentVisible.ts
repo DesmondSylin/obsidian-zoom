@@ -1,5 +1,11 @@
 import { EditorState, Extension, StateField } from "@codemirror/state";
-import { Decoration, DecorationSet, EditorView } from "@codemirror/view";
+import {
+  Decoration,
+  DecorationSet,
+  EditorView,
+  ViewPlugin,
+  ViewUpdate,
+} from "@codemirror/view";
 
 import { zoomInEffect, zoomOutEffect } from "./utils/effects";
 import { rangeSetToArray } from "./utils/rangeSetToArray";
@@ -44,11 +50,46 @@ const zoomStateField = StateField.define<DecorationSet>({
   provide: (zoomStateField) => EditorView.decorations.from(zoomStateField),
 });
 
+// Plugin to remove inline indent styles when zoomed
+const removeIndentPlugin = ViewPlugin.fromClass(
+  class {
+    constructor(private view: EditorView) {
+      this.removeIndentStyles();
+    }
+
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.viewportChanged || update.selectionSet) {
+        this.removeIndentStyles();
+      }
+    }
+
+    removeIndentStyles() {
+      const editorEl = this.view.dom.closest(".cm-editor") as HTMLElement;
+      if (
+        editorEl &&
+        editorEl.classList.contains("zoom-plugin-remove-indent")
+      ) {
+        // Remove inline styles from all visible lines
+        const lines = this.view.dom.querySelectorAll(".cm-line");
+        lines.forEach((line) => {
+          const lineEl = line as HTMLElement;
+          if (lineEl.style.paddingInlineStart) {
+            lineEl.style.paddingInlineStart = "0";
+          }
+          if (lineEl.style.textIndent) {
+            lineEl.style.textIndent = "0";
+          }
+        });
+      }
+    }
+  }
+);
+
 export class KeepOnlyZoomedContentVisible {
   constructor(private logger: LoggerService) {}
 
   public getExtension(): Extension {
-    return zoomStateField;
+    return [zoomStateField, removeIndentPlugin];
   }
 
   public calculateHiddenContentRanges(state: EditorState) {
@@ -94,10 +135,6 @@ export class KeepOnlyZoomedContentVisible {
       const editorEl = view.dom.closest(".cm-editor") as HTMLElement;
       if (editorEl) {
         editorEl.classList.add("zoom-plugin-remove-indent");
-        editorEl.style.setProperty(
-          "--zoom-indent-chars",
-          indentChars.toString()
-        );
         this.logger.log(
           "KeepOnlyZoomedContent:applyIndentRemoval",
           "applying indent removal",
@@ -111,7 +148,6 @@ export class KeepOnlyZoomedContentVisible {
     const editorEl = view.dom.closest(".cm-editor") as HTMLElement;
     if (editorEl) {
       editorEl.classList.remove("zoom-plugin-remove-indent");
-      editorEl.style.removeProperty("--zoom-indent-chars");
       this.logger.log(
         "KeepOnlyZoomedContent:removeIndentRemoval",
         "removing indent removal"

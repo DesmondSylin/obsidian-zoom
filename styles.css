@@ -42,11 +42,7 @@
   border-bottom-color: var(--background-modifier-border);
 }
 
-/* Remove indent when zoomed into indented list */
-.cm-editor.zoom-plugin-remove-indent .cm-content {
-  margin-left: calc(var(--zoom-indent-chars, 0) * -1ch);
-}
-
-.cm-editor.zoom-plugin-remove-indent .cm-line {
-  padding-left: 0;
+/* Marker class for indented list zoom - actual styles are applied via ViewPlugin */
+.cm-editor.zoom-plugin-remove-indent {
+  /* This class is used by the ViewPlugin to identify when to remove inline indent styles */
 }
