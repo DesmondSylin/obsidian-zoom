@@ -4,7 +4,6 @@ import {
   DecorationSet,
   EditorView,
   ViewPlugin,
-  ViewUpdate,
 } from "@codemirror/view";
 
 import { zoomInEffect, zoomOutEffect } from "./utils/effects";
@@ -59,13 +58,6 @@ const removeIndentPlugin = ViewPlugin.fromClass(
     constructor(private view: EditorView) {
       this.startContinuousRemoval();
       this.setupMutationObserver();
-    }
-
-    update(update: ViewUpdate) {
-      // Ensure continuous removal is running
-      if (!this.rafId) {
-        this.startContinuousRemoval();
-      }
     }
 
     setupMutationObserver() {
