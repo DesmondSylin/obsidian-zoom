@@ -4,7 +4,6 @@ import {
   DecorationSet,
   EditorView,
   ViewPlugin,
-  ViewUpdate,
 } from "@codemirror/view";
 
 import { zoomInEffect, zoomOutEffect } from "./utils/effects";
@@ -53,14 +52,36 @@ const zoomStateField = StateField.define<DecorationSet>({
 // Plugin to remove inline indent styles when zoomed
 const removeIndentPlugin = ViewPlugin.fromClass(
   class {
+    private rafId: number | null = null;
+    private observer: MutationObserver | null = null;
+
     constructor(private view: EditorView) {
-      this.removeIndentStyles();
+      this.startContinuousRemoval();
+      this.setupMutationObserver();
     }
 
-    update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged || update.selectionSet) {
-        this.removeIndentStyles();
+    setupMutationObserver() {
+      const editorEl = this.view.dom.closest(".cm-editor") as HTMLElement;
+      if (editorEl) {
+        this.observer = new MutationObserver(() => {
+          this.removeIndentStyles();
+        });
+
+        this.observer.observe(this.view.dom, {
+          attributes: true,
+          attributeFilter: ["style"],
+          subtree: true,
+          childList: true,
+        });
       }
+    }
+
+    startContinuousRemoval() {
+      const loop = () => {
+        this.removeIndentStyles();
+        this.rafId = requestAnimationFrame(loop);
+      };
+      this.rafId = requestAnimationFrame(loop);
     }
 
     removeIndentStyles() {
@@ -73,13 +94,25 @@ const removeIndentPlugin = ViewPlugin.fromClass(
         const lines = this.view.dom.querySelectorAll(".cm-line");
         lines.forEach((line) => {
           const lineEl = line as HTMLElement;
-          if (lineEl.style.paddingInlineStart) {
-            lineEl.style.paddingInlineStart = "0";
-          }
-          if (lineEl.style.textIndent) {
-            lineEl.style.textIndent = "0";
-          }
+          // Use setProperty with important flag to override inline styles
+          lineEl.style.setProperty("padding-inline-start", "0", "important");
+          lineEl.style.setProperty("text-indent", "0", "important");
         });
+      } else if (this.rafId !== null) {
+        // Stop the loop when not in zoom mode
+        cancelAnimationFrame(this.rafId);
+        this.rafId = null;
+      }
+    }
+
+    destroy() {
+      if (this.rafId !== null) {
+        cancelAnimationFrame(this.rafId);
+        this.rafId = null;
+      }
+      if (this.observer) {
+        this.observer.disconnect();
+        this.observer = null;
       }
     }
   }
